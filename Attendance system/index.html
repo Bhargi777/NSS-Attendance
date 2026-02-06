@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSS Attendance - Smart QR Scanner</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-glow: rgba(99, 102, 241, 0.5);
+            --secondary: #a855f7;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background: radial-gradient(circle at top right, #1e1b4b, #0f172a);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        h1,
+        h2,
+        h3 {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Glassmorphism Background Decoration */
+        .blob {
+            position: fixed;
+            width: 300px;
+            height: 300px;
+            background: var(--primary);
+            filter: blur(80px);
+            border-radius: 50%;
+            z-index: -1;
+            opacity: 0.15;
+            animation: move 20s infinite alternate;
+        }
+
+        .blob-2 {
+            background: var(--secondary);
+            right: 0;
+            bottom: 0;
+            animation-delay: -10s;
+        }
+
+        @keyframes move {
+            from {
+                transform: translate(0, 0);
+            }
+
+            to {
+                transform: translate(100px, 100px);
+            }
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-section img {
+            height: 50px;
+            width: auto;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 850px) {
+            .grid-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                padding: 10px;
+            }
+
+            header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+
+            .logo-section {
+                flex-direction: column;
+            }
+
+            /* Make scanner square on mobile but not too big */
+            #scanner-wrapper {
+                max-height: 400px;
+            }
+        }
+
+        /* Card Styles */
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title i {
+            color: var(--primary);
+        }
+
+        /* Scanner Area */
+        #scanner-wrapper {
+            position: relative;
+            width: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #000;
+            aspect-ratio: 1/1;
+            margin-bottom: 20px;
+            border: 2px solid var(--glass-border);
+        }
+
+        #reader {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        #reader video {
+            object-fit: cover !important;
+        }
+
+        /* Hide html5-qrcode's default UI junk */
+        #reader__dashboard,
+        #reader__header_tagline,
+        #reader img {
+            display: none !important;
+        }
+
+        .scanner-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 2px solid transparent;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .scanner-scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary);
+            box-shadow: 0 0 15px var(--primary);
+            animation: scan 2s linear infinite;
+        }
+
+        @keyframes scan {
+            0% {
+                top: 0;
+            }
+
+            50% {
+                top: 100%;
+            }
+
+            100% {
+                top: 0;
+            }
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px var(--primary-glow);
+        }
+
+        .btn {
+            padding: 14px 20px;
+            border-radius: 12px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.95rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+        }
+
+        .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--text-dim);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Attendance List */
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .count-badge {
+            background: var(--primary);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .attendance-list {
+            max-height: 500px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 5px;
+        }
+
+        /* Custom Scrollbar */
+        .attendance-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .attendance-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .attendance-list::-webkit-scrollbar-thumb {
+            background: var(--glass-border);
+            border-radius: 10px;
+        }
+
+        .attendance-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .item-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .item-roll {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-main);
+        }
+
+        .item-time {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .delete-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 5px;
+            transition: color 0.2s;
+        }
+
+        .delete-btn:hover {
+            color: var(--danger);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-dim);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            opacity: 0.2;
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            padding: 12px 24px;
+            border-radius: 100px;
+            z-index: 1000;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .toast.visible {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast-icon {
+            color: var(--success);
+        }
+
+        /* Scan Success Modal */
+        .scan-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--primary);
+            padding: 30px;
+            border-radius: 24px;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(99, 102, 241, 0.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .scan-modal.active {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+            pointer-events: all;
+        }
+
+        .scan-modal-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .scan-modal-icon svg {
+            width: 40px;
+            height: 40px;
+        }
+    </style>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div class="blob"></div>
+    <div class="blob blob-2"></div>
+
+    <div class="container">
+        <header>
+            <div class="logo-section">
+                <!-- Fallback to text if images are missing -->
+                <img src="NSS.png" alt="NSS Logo" onerror="this.style.display='none'">
+                <img src="AMRITA.png" alt="Amrita Logo" onerror="this.style.display='none'">
+                <div>
+                    <h1>Attendance Portal</h1>
+                    <p style="font-size: 0.8rem; color: var(--text-dim);">National Service Scheme</p>
+                </div>
+            </div>
+            <button class="btn btn-outline" onclick="exportToCSV()" id="exportBtn">
+                <i data-lucide="download"></i> Export CSV
+            </button>
+        </header>
+
+        <div class="grid-layout">
+            <!-- Left Column: Scanner & Input -->
+            <div class="glass-card">
+                <h2 class="section-title"><i data-lucide="scan-barcode"></i> Live Scanner</h2>
+
+                <div id="scanner-wrapper">
+                    <div id="reader"></div>
+                    <div class="scanner-overlay" id="scannerOverlay" style="display: none;">
+                        <div class="scanner-scan-line"></div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button id="cameraBtn" class="btn btn-primary" onclick="toggleCamera()">
+                        <i data-lucide="camera"></i> Start Camera
+                    </button>
+
+                    <div style="margin: 15px 0; display: flex; align-items: center; gap: 10px;">
+                        <div style="flex: 1; height: 1px; background: var(--glass-border);"></div>
+                        <span style="font-size: 0.8rem; color: var(--text-dim);">OR MANUAL ENTRY</span>
+                        <div style="flex: 1; height: 1px; background: var(--glass-border);"></div>
+                    </div>
+
+                    <input type="text" id="manualRoll" placeholder="Enter Roll Number..."
+                        style="text-transform: uppercase;">
+                    <button class="btn btn-outline" onclick="addManual()">
+                        <i data-lucide="plus"></i> Add Manually
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Column: Live List -->
+            <div class="glass-card">
+                <div class="list-header">
+                    <h2 class="section-title"><i data-lucide="users"></i> Attendance List</h2>
+                    <span class="count-badge" id="scannedCount">0</span>
+                </div>
+
+                <div class="attendance-list" id="attendanceList">
+                    <!-- List items will be injected here -->
+                    <div class="empty-state">
+                        <i data-lucide="qr-code"></i>
+                        <p>No roll numbers scanned yet.</p>
+                        <span style="font-size: 0.8rem; opacity: 0.6;">Scan a QR code or enter manually to begin.</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
+                    <button class="btn btn-danger" onclick="clearList()" style="width: 100%;">
+                        <i data-lucide="trash-2"></i> Clear Session Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">
+        <i data-lucide="check-circle" class="toast-icon"></i>
+        <span id="toastMsg">Attendance Marked!</span>
+    </div>
+
+    <!-- Scan Success Modal -->
+    <div id="scanModal" class="scan-modal">
+        <div class="scan-modal-icon">
+            <i data-lucide="check"></i>
+        </div>
+        <h2 id="modalRoll" style="font-size: 1.8rem; margin-bottom: 5px;">CB.SC.XX...</h2>
+        <p id="modalName" style="color: var(--text-dim); font-size: 1.1rem; margin-bottom: 5px;">Student Name</p>
+        <div style="font-size: 0.9rem; color: var(--success); font-weight: 600;">Marked Present</div>
+    </div>
+
+    <!-- Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script>
+        // State Management
+        let records = JSON.parse(localStorage.getItem('nss_attendance') || '[]');
+        let html5QrCode = null;
+        let isScanning = false;
+
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Update UI On Load
+        renderList();
+
+        function renderList() {
+            const listContainer = document.getElementById('attendanceList');
+            const countBadge = document.getElementById('scannedCount');
+
+            countBadge.innerText = records.length;
+
+            if (records.length === 0) {
+                listContainer.innerHTML = `
+                    <div class="empty-state">
+                        <i data-lucide="qr-code"></i>
+                        <p>No roll numbers scanned yet.</p>
+                        <span style="font-size: 0.8rem; opacity: 0.6;">Scan a QR code or enter manually to begin.</span>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            listContainer.innerHTML = records.map((rec, index) => `
+                <div class="attendance-item">
+                    <div class="item-info">
+                        <span class="item-roll">${rec.roll}</span>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <span class="item-time">${rec.time}</span>
+                            <span style="font-size: 0.7rem; color: var(--primary); font-weight: 600;">${rec.name}</span>
+                        </div>
+                    </div>
+                    <button class="delete-btn" onclick="deleteRecord(${index})">
+                        <i data-lucide="x-circle"></i>
+                    </button>
+                </div>
+            `).reverse().join('');
+
+            lucide.createIcons();
+        }
+
+        function addRecord(data) {
+            let roll = data.trim();
+            let name = "";
+
+            // Check if it's the specific format: ROLL=xxx;NAME=yyy
+            if (roll.includes('ROLL=') && roll.includes('NAME=')) {
+                try {
+                    const parts = roll.split(';');
+                    const rollPart = parts.find(p => p.startsWith('ROLL='));
+                    const namePart = parts.find(p => p.startsWith('NAME='));
+                    roll = rollPart ? rollPart.split('=')[1] : roll;
+                    name = namePart ? namePart.split('=')[1] : "";
+                } catch (e) {
+                    console.error("Format parsing error", e);
+                }
+            }
+
+            roll = roll.toUpperCase();
+            if (!roll) return;
+
+            // Check for duplicates in current session
+            const isDuplicate = records.some(r => r.roll === roll);
+            if (isDuplicate) {
+                showToast(`Already scanned: ${roll}`, 'danger');
+                return;
+            }
+
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            records.push({
+                roll,
+                name: name || "Manual Entry",
+                time: timeStr,
+                date: now.toLocaleDateString()
+            });
+            localStorage.setItem('nss_attendance', JSON.stringify(records));
+
+            renderList();
+            
+            // Show new Modal
+            showScanModal(roll, name);
+            
+            // Audio Feedback
+            playSuccessBeep();
+        }
+
+        function showScanModal(roll, name) {
+            const modal = document.getElementById('scanModal');
+            document.getElementById('modalRoll').innerText = roll;
+            document.getElementById('modalName').innerText = name || "Verified";
+            
+            modal.classList.add('active');
+            lucide.createIcons();
+
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                modal.classList.remove('active');
+            }, 3000);
+        }
+
+        function playSuccessBeep() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.2);
+            } catch (e) { }
+        }
+
+        function addManual() {
+            const input = document.getElementById('manualRoll');
+            const val = input.value.trim();
+            if (val) {
+                addRecord(val);
+                input.value = '';
+            }
+        }
+
+        function deleteRecord(index) {
+            index = records.length - 1 - index; // Adjust for reversed display
+            records.splice(index, 1);
+            localStorage.setItem('nss_attendance', JSON.stringify(records));
+            renderList();
+        }
+
+        function clearList() {
+            if (confirm('Are you sure you want to clear all records for this session?')) {
+                records = [];
+                localStorage.removeItem('nss_attendance');
+                renderList();
+            }
+        }
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const icon = toast.querySelector('.toast-icon');
+
+            toastMsg.innerText = msg;
+
+            if (type === 'danger') {
+                icon.style.color = 'var(--danger)';
+                icon.setAttribute('data-lucide', 'alert-circle');
+            } else {
+                icon.style.color = 'var(--success)';
+                icon.setAttribute('data-lucide', 'check-circle');
+            }
+
+            lucide.createIcons();
+
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 3000);
+        }
+
+        // Camera Logic
+        async function toggleCamera() {
+            const btn = document.getElementById('cameraBtn');
+            const overlay = document.getElementById('scannerOverlay');
+
+            if (isScanning) {
+                await stopCamera();
+                btn.innerHTML = '<i data-lucide="camera"></i> Start Camera';
+                btn.classList.add('btn-primary');
+                btn.classList.remove('btn-danger');
+                overlay.style.display = 'none';
+            } else {
+                try {
+                    await startCamera();
+                    btn.innerHTML = '<i data-lucide="camera-off"></i> Stop Camera';
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-danger');
+                    overlay.style.display = 'block';
+                } catch (err) {
+                    console.error(err);
+                    showToast("Camera Error: " + err, 'danger');
+                }
+            }
+            isScanning = !isScanning;
+            lucide.createIcons();
+        }
+
+        function startCamera() {
+            html5QrCode = new Html5Qrcode("reader");
+            return html5QrCode.start(
+                { facingMode: "environment" },
+                {
+                    fps: 15,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0,
+                    formatsToSupport: [
+                        Html5QrcodeSupportedFormats.QR_CODE,
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.UPC_A
+                    ]
+                },
+                (decodedText) => {
+                    addRecord(decodedText);
+                    // Add a small delay to prevent rapid duplicate scans
+                },
+                (errorMessage) => {
+                    // silent
+                }
+            );
+        }
+
+        function stopCamera() {
+            if (html5QrCode) {
+                return html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    html5QrCode = null;
+                });
+            }
+        }
+
+        function exportToCSV() {
+            if (records.length === 0) {
+                showToast("No records to export!", 'danger');
+                return;
+            }
+
+            const headers = ['Roll Number', 'Name', 'Time', 'Date'];
+            const csvRows = [headers.join(',')];
+
+            for (const rec of records) {
+                csvRows.push(`${rec.roll},"${rec.name}",${rec.time},${rec.date}`);
+            }
+
+            const csvContent = csvRows.join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+
+            const now = new Date();
+            const filename = `NSS_Attendance_${now.toISOString().split('T')[0]}.csv`;
+
+            a.setAttribute('href', url);
+            a.setAttribute('download', filename);
+            a.click();
+            window.URL.revokeObjectURL(url);
+
+            showToast("CSV Exported!");
+        }
+
+        // Enter key support for manual entry
+        document.getElementById('manualRoll').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addManual();
+        });
+    </script>
+</body>
+
+</html>
