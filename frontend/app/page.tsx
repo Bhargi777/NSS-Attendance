@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { generateQR } from "../services/api";
 import QRModal from "../components/QRModal";
 
 export default function Home() {
+  const router = useRouter();
   const [rollNumber, setRollNumber] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [qrImageBase64, setQrImageBase64] = useState("");
@@ -16,6 +18,13 @@ export default function Home() {
 
     // Client-side validation
     const trimmed = rollNumber.trim();
+
+    // Check for admin redirection
+    if (trimmed === "CB.SC.U4CSE24268") {
+      router.push("/scanner");
+      return;
+    }
+
     if (!trimmed) {
       setError("Please enter a roll number.");
       return;
