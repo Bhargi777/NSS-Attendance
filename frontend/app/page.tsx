@@ -24,8 +24,8 @@ export default function Home() {
       setError("Roll number must be between 5 and 20 characters.");
       return;
     }
-    if (!/^[a-zA-Z0-9-]+$/.test(trimmed)) {
-      setError("Roll number must contain only letters, numbers, and hyphens.");
+    if (!/^[a-zA-Z0-9.\-]+$/.test(trimmed)) {
+      setError("Roll number must contain only letters, numbers, dots, and hyphens.");
       return;
     }
 

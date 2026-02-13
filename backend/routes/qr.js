@@ -26,7 +26,7 @@ function validateRollNumber(rollNumber) {
     if (trimmed.length < 5 || trimmed.length > 20) {
         return false;
     }
-    return /^[a-zA-Z0-9-]+$/.test(trimmed);
+    return /^[a-zA-Z0-9.\-]+$/.test(trimmed);
 }
 
 /**
@@ -43,7 +43,7 @@ router.post("/generate-qr", async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message:
-                    "Invalid roll number. Must be 5-20 alphanumeric characters (hyphens allowed).",
+                    "Invalid roll number. Must be 5-20 alphanumeric characters (dots and hyphens allowed).",
             });
         }
 
