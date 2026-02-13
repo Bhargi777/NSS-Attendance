@@ -28,7 +28,7 @@ export default function ScannerPage() {
             .channel("attendance_changes")
             .on(
                 "postgres_changes",
-                { event: "*", scheme: "public", table: "attendance" },
+                { event: "*", schema: "public", table: "attendance" },
                 () => {
                     fetchEntries();
                 }
