@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import Link from "next/link";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 interface ScannedEntry {
     id?: string;

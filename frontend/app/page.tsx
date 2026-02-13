@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { generateQR } from "../services/api";
-import QRModal from "../components/QRModal";
+import { generateQR } from "@/services/api";
+import QRModal from "@/components/QRModal";
 
 export default function Home() {
   const router = useRouter();
