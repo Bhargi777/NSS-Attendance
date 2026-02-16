@@ -160,7 +160,7 @@ export default function ScannerPage() {
     };
 
     return (
-        <main className="relative flex min-h-screen flex-col items-center bg-[#0a0a1a] p-4 text-white md:p-8">
+        <main className="relative flex min-h-screen flex-col items-center bg-black p-4 text-white md:p-8">
             {/* Orbs */}
             <div className="pointer-events-none absolute -left-40 -top-40 h-96 w-96 rounded-full bg-[#e94560]/10 blur-[120px]" />
             <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-[#533483]/10 blur-[120px]" />
@@ -168,7 +168,7 @@ export default function ScannerPage() {
             {/* ERROR MODAL */}
             {modalError && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
-                    <div className="mx-4 w-full max-w-sm animate-fade-in rounded-2xl border border-red-500/30 bg-[#1a0a0a] p-8 text-center shadow-[0_0_50px_rgba(233,69,96,0.3)]">
+                    <div className="mx-4 w-full max-w-sm animate-fade-in rounded-2xl border border-red-500/30 bg-black p-8 text-center shadow-[0_0_50px_rgba(233,69,96,0.3)]">
                         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20 text-red-500">
                             <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
                         </div>
@@ -234,7 +234,7 @@ export default function ScannerPage() {
                         <div className="flex-1 overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.04] backdrop-blur-xl shadow-xl">
                             <div className="max-h-[580px] overflow-y-auto scrollbar-hide">
                                 <table className="w-full text-left">
-                                    <thead className="sticky top-0 z-20 bg-[#16162a]/95 backdrop-blur-sm text-[10px] font-black uppercase tracking-[0.2em] text-white/20">
+                                    <thead className="sticky top-0 z-20 bg-black/95 backdrop-blur-sm text-[10px] font-black uppercase tracking-[0.2em] text-white/20">
                                         <tr>
                                             <th className="px-6 py-5">Roll No.</th>
                                             <th className="px-6 py-5">Sync Time</th>

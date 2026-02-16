@@ -61,7 +61,7 @@ export default function Home() {
   };
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#0a0a1a] px-4">
+    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-black px-4">
       {/* Background gradient orbs */}
       <div className="pointer-events-none absolute -left-40 -top-40 h-96 w-96 rounded-full bg-[#e94560]/20 blur-[120px]" />
       <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-[#533483]/20 blur-[120px]" />

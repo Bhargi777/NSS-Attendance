@@ -59,7 +59,7 @@ export default function QRModal({
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all duration-300"
             onClick={handleOverlayClick}
         >
-            <div className="relative mx-4 w-full max-w-sm animate-fade-in rounded-2xl border border-white/10 bg-gradient-to-b from-[#1a1a2e] to-[#16213e] p-8 shadow-2xl">
+            <div className="relative mx-4 w-full max-w-sm animate-fade-in rounded-2xl border border-white/10 bg-gradient-to-b from-[#0a0a0a] to-[#000000] p-8 shadow-2xl">
                 <button
                     onClick={onClose}
                     className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/70 transition-colors hover:bg-white/20 hover:text-white"
