@@ -13,6 +13,10 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState("");
 
+  const [isAdminSetupOpen, setIsAdminSetupOpen] = useState(false);
+  const [adminDate, setAdminDate] = useState(new Date().toISOString().split("T")[0]);
+  const [adminHours, setAdminHours] = useState("2");
+
   const handleGenerate = async () => {
     setError("");
 
@@ -20,7 +24,7 @@ export default function Home() {
     const trimmed = rollNumber.trim();
     // Check for admin redirection
     if (trimmed.toLowerCase() === "bhargi") {
-      router.push("/scanner");
+      setIsAdminSetupOpen(true);
       return;
     }
     if (!trimmed) {
@@ -162,6 +166,61 @@ export default function Home() {
           )}
         </button>
       </div>
+
+      {/* Admin Setup Modal */}
+      {isAdminSetupOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
+          <div className="mx-4 w-full max-w-sm animate-fade-in rounded-2xl border border-white/[0.08] bg-black p-8 shadow-2xl">
+            <h3 className="mb-4 text-xl font-bold text-white">Scanner Setup</h3>
+
+            <div className="mb-4">
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-white/50">
+                Date
+              </label>
+              <input
+                type="date"
+                value={adminDate}
+                onChange={(e) => setAdminDate(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none focus:border-[#e94560]/50"
+              />
+            </div>
+
+            <div className="mb-6">
+              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-white/50">
+                Working Hours
+              </label>
+              <input
+                type="number"
+                value={adminHours}
+                onChange={(e) => setAdminHours(e.target.value)}
+                min="0"
+                step="0.5"
+                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none focus:border-[#e94560]/50"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsAdminSetupOpen(false)}
+                className="flex-1 rounded-xl bg-white/5 py-3 text-sm font-semibold text-white/70 hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (!adminDate || !adminHours) return;
+                  localStorage.setItem("attendance_date", adminDate);
+                  localStorage.setItem("attendance_hours", adminHours);
+                  router.push("/scanner");
+                }}
+                className="flex-1 rounded-xl bg-gradient-to-r from-[#e94560] to-[#c23152] py-3 text-sm font-semibold text-white hover:scale-105 transition-transform"
+              >
+                Start Scanner
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <p className="mt-8 text-xs text-white/20">
