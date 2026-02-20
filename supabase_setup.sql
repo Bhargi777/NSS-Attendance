@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS students (
     roll_number TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone(utc::text, now())
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
 -- 2. CREATE ATTENDANCE TABLE
@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS attendance (
     roll_number TEXT REFERENCES students(roll_number) ON DELETE CASCADE,
     date DATE NOT NULL,
     hours NUMERIC DEFAULT 0,
-    scanned_at TIMESTAMP WITH TIME ZONE DEFAULT timezone(utc::text, now()),
+    scanned_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     UNIQUE(roll_number, date)
 );
 
