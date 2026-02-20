@@ -39,3 +39,22 @@ USING (true);
 
 -- 5. Enable real-time subscriptions for the table
 ALTER PUBLICATION supabase_realtime ADD TABLE attendance;
+
+-- ==========================================
+-- Optional: Students Table (for seeding/lookup)
+-- ==========================================
+CREATE TABLE IF NOT EXISTS students (
+    roll_number TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    department TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS for students
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+
+-- Allow public read access to students
+CREATE POLICY "Allow public read access to students" 
+ON students 
+FOR SELECT 
+USING (true);
