@@ -2,18 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { listAll, LogEntry } from "@/services/sheets";
 
-interface Attendance {
-    roll_number: string;
-    date: string;
-    hours: number;
-}
+type Attendance = LogEntry;
 
-interface AttendanceTotal {
-    roll_number: string;
-    total_hours: number;
-}
+const REFRESH_INTERVAL_MS = 10000;
 
 export default function DashboardPage() {
     const [rollNumbers, setRollNumbers] = useState<string[]>([]);
@@ -24,60 +17,34 @@ export default function DashboardPage() {
 
     useEffect(() => {
         const fetchDashboardData = async () => {
-            const [attendanceRes, totalsRes] = await Promise.all([
-                supabase.from("attendance").select("*"),
-                supabase.from("attendance_totals").select("roll_number, total_hours"),
-            ]);
+            const { log, totals: totalsData } = await listAll();
 
-            if (attendanceRes.data) {
-                setAttendance(attendanceRes.data);
+            setAttendance(log);
 
-                // Roster is whoever has been scanned at least once, sorted by roll number
-                const uniqueRolls = Array.from(new Set(attendanceRes.data.map((a: Attendance) => a.roll_number)));
-                uniqueRolls.sort((a, b) => a.localeCompare(b));
-                setRollNumbers(uniqueRolls);
+            // Roster is whoever has been scanned at least once, sorted by roll number
+            const uniqueRolls = Array.from(new Set(log.map((a) => a.roll_number)));
+            uniqueRolls.sort((a, b) => a.localeCompare(b));
+            setRollNumbers(uniqueRolls);
 
-                // Extract unique dates and sort them chronologically
-                const uniqueDates = Array.from(new Set(attendanceRes.data.map((a: Attendance) => a.date))).filter(Boolean) as string[];
-                uniqueDates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-                setDates(uniqueDates);
-            }
+            // Extract unique dates and sort them chronologically
+            const uniqueDates = Array.from(new Set(log.map((a) => a.date))).filter(Boolean) as string[];
+            uniqueDates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+            setDates(uniqueDates);
 
-            if (totalsRes.data) {
-                const map: Record<string, number> = {};
-                totalsRes.data.forEach((t: AttendanceTotal) => {
-                    map[t.roll_number] = t.total_hours;
-                });
-                setTotals(map);
-            }
+            const map: Record<string, number> = {};
+            totalsData.forEach((t) => {
+                map[t.roll_number] = t.total_hours;
+            });
+            setTotals(map);
 
             setIsLoading(false);
         };
 
         fetchDashboardData();
 
-        // Optional: Realtime updating on the dashboard
-        const channel = supabase
-            .channel("dashboard_changes")
-            .on(
-                "postgres_changes",
-                { event: "*", schema: "public", table: "attendance" },
-                () => {
-                    fetchDashboardData();
-                }
-            )
-            .on(
-                "postgres_changes",
-                { event: "*", schema: "public", table: "attendance_totals" },
-                () => {
-                    fetchDashboardData();
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        // Sheets has no realtime push — poll instead.
+        const interval = setInterval(fetchDashboardData, REFRESH_INTERVAL_MS);
+        return () => clearInterval(interval);
     }, []);
 
     const getHours = (rollNumber: string, date: string) => {

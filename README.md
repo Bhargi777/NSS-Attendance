@@ -65,7 +65,10 @@ Create a `.env.local` file:
 
 ```
 NEXT_PUBLIC_BACKEND_URL=http://localhost:5000
+NEXT_PUBLIC_SHEETS_API_URL=https://script.google.com/macros/s/your-deployment-id/exec
 ```
+
+`NEXT_PUBLIC_SHEETS_API_URL` is the Apps Script Web App deployment URL — see `apps-script/Code.gs` for setup (Script Properties, deployment, and the passcode used to gate the scanner).
 
 Then start the dev server:
 

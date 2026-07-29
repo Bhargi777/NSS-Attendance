@@ -4,6 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { generateQR } from "@/services/api";
 import QRModal from "@/components/QRModal";
+import PasscodeForm from "@/components/PasscodeForm";
+import { getStoredToken } from "@/services/sheets";
+
+type AdminStep = "closed" | "passcode" | "setup";
 
 export default function Home() {
   const router = useRouter();
@@ -13,20 +17,21 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState("");
 
-  const [isAdminSetupOpen, setIsAdminSetupOpen] = useState(false);
+  const [adminStep, setAdminStep] = useState<AdminStep>("closed");
   const [adminDate, setAdminDate] = useState(new Date().toISOString().split("T")[0]);
   const [adminHours, setAdminHours] = useState("2");
+
+  const openAdminPanel = () => {
+    const token = getStoredToken();
+    const [expiry] = (token || "").split(".");
+    const alreadyUnlocked = token && Number(expiry) > Date.now();
+    setAdminStep(alreadyUnlocked ? "setup" : "passcode");
+  };
 
   const handleGenerate = async () => {
     setError("");
 
-    // Client-side validation
     const trimmed = rollNumber.trim();
-    // Check for admin redirection
-    if (trimmed.toLowerCase() === "bhargi") {
-      setIsAdminSetupOpen(true);
-      return;
-    }
     if (!trimmed) {
       setError("Please enter a roll number.");
       return;
@@ -167,8 +172,18 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Admin Setup Modal */}
-      {isAdminSetupOpen && (
+      {/* Admin Panel: passcode step */}
+      {adminStep === "passcode" && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
+          <PasscodeForm
+            subtitle="Enter the scanner passcode to open the admin panel."
+            onSuccess={() => setAdminStep("setup")}
+          />
+        </div>
+      )}
+
+      {/* Admin Panel: date/hours step */}
+      {adminStep === "setup" && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
           <div className="mx-4 w-full max-w-sm animate-fade-in rounded-2xl border border-white/[0.08] bg-black p-8 shadow-2xl">
             <h3 className="mb-4 text-xl font-bold text-white">Scanner Setup</h3>
@@ -201,7 +216,7 @@ export default function Home() {
 
             <div className="flex gap-3">
               <button
-                onClick={() => setIsAdminSetupOpen(false)}
+                onClick={() => setAdminStep("closed")}
                 className="flex-1 rounded-xl bg-white/5 py-3 text-sm font-semibold text-white/70 hover:bg-white/10"
               >
                 Cancel
@@ -223,7 +238,13 @@ export default function Home() {
       )}
 
       {/* Footer */}
-      <p className="mt-8 text-xs text-white/20">
+      <button
+        onClick={openAdminPanel}
+        className="mt-8 text-xs font-semibold uppercase tracking-widest text-white/20 hover:text-white/50 transition-colors"
+      >
+        Admin
+      </button>
+      <p className="mt-1 text-xs text-white/20">
         Amrita Vishwa Vidyapeetham
       </p>
 

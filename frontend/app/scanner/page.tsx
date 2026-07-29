@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import PasscodeGate from "./PasscodeGate";
+import { recordScan, listTotals, deleteEntry, clearAllEntries, TotalsEntry } from "@/services/sheets";
 
-interface ScannedEntry {
-    roll_number: string;
-    total_hours: number;
-    last_date: string;
-    last_scanned_at: string;
-}
+type ScannedEntry = TotalsEntry;
 
-export default function ScannerPage() {
+const REFRESH_INTERVAL_MS = 10000;
+
+function ScannerPageInner() {
     const [entries, setEntries] = useState<ScannedEntry[]>([]);
     const [manualInput, setManualInput] = useState("");
     const [isScanning, setIsScanning] = useState(false);
@@ -26,22 +24,17 @@ export default function ScannerPage() {
         typeof window !== "undefined" ? Number(localStorage.getItem("attendance_hours")) || 2 : 2
     );
 
-    const fetchEntries = async (currentDate: string) => {
-        const { data, error } = await supabase
-            .from("attendance_totals")
-            .select("*")
-            .eq("last_date", currentDate)
-            .order("last_scanned_at", { ascending: false });
-
-        if (error) {
-            console.error("Error fetching attendance:", error);
-        } else {
-            setEntries(data || []);
-        }
+    const fetchEntries = useCallback(async (currentDate: string) => {
+        const all = await listTotals();
+        setEntries(
+            all
+                .filter((e) => e.last_date === currentDate)
+                .sort((a, b) => new Date(b.last_scanned_at).getTime() - new Date(a.last_scanned_at).getTime())
+        );
         setIsLoading(false);
-    };
+    }, []);
 
-    // Fetch from Supabase on mount
+    // Fetch on mount, then poll — Sheets has no realtime push.
     useEffect(() => {
         if (!adminDate) {
             window.location.href = "/";
@@ -51,23 +44,9 @@ export default function ScannerPage() {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- fetching attendance rows on mount is the intended effect
         fetchEntries(adminDate);
 
-        // Set up Realtime subscription
-        const channel = supabase
-            .channel("attendance_totals_changes")
-            .on(
-                "postgres_changes",
-                { event: "*", schema: "public", table: "attendance_totals" },
-                () => {
-                    const date = localStorage.getItem("attendance_date");
-                    if (date) fetchEntries(date);
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [adminDate]);
+        const interval = setInterval(() => fetchEntries(adminDate), REFRESH_INTERVAL_MS);
+        return () => clearInterval(interval);
+    }, [adminDate, fetchEntries]);
 
     // Auto-hide error modal
     useEffect(() => {
@@ -116,17 +95,13 @@ export default function ScannerPage() {
             return;
         }
 
-        const { error } = await supabase.rpc("record_scan", {
-            p_roll: trimmed,
-            p_date: adminDate,
-            p_hours: adminHours,
-        });
+        const result = await recordScan(trimmed, adminDate, adminHours);
 
-        if (error) {
-            if (error.message.includes("DUPLICATE_SCAN")) {
+        if (!result.success) {
+            if (result.code === "DUPLICATE_SCAN") {
                 triggerError(`DUPLICATE: ${trimmed} is already scanned today.`);
             } else {
-                triggerError("Database error: " + error.message);
+                triggerError("Database error: " + result.message);
             }
             return;
         }
@@ -135,7 +110,7 @@ export default function ScannerPage() {
         if (typeof navigator !== "undefined" && navigator.vibrate) {
             navigator.vibrate(50);
         }
-        // Realtime will update the list
+        fetchEntries(adminDate);
     };
 
     const triggerError = (msg: string) => {
@@ -154,23 +129,16 @@ export default function ScannerPage() {
 
     const removeEntry = async (rollNumber: string) => {
         if (!confirm(`Remove ${rollNumber} entirely (total hours + history)?`)) return;
-        const [logResult, totalsResult] = await Promise.all([
-            supabase.from("attendance").delete().eq("roll_number", rollNumber),
-            supabase.from("attendance_totals").delete().eq("roll_number", rollNumber),
-        ]);
-        if (logResult.error) triggerError("Delete failed: " + logResult.error.message);
-        else if (totalsResult.error) triggerError("Delete failed: " + totalsResult.error.message);
-        else fetchEntries(adminDate!);
+        const result = await deleteEntry(rollNumber);
+        if (!result.success) triggerError("Delete failed: " + result.message);
+        else if (adminDate) fetchEntries(adminDate);
     };
 
     const clearAll = async () => {
-        if (!confirm("DANGER: This will delete ALL attendance records from Supabase. Continue?")) return;
-        const [logResult, totalsResult] = await Promise.all([
-            supabase.from("attendance").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
-            supabase.from("attendance_totals").delete().neq("roll_number", ""),
-        ]);
-        if (logResult.error) triggerError("Clear failed: " + logResult.error.message);
-        else if (totalsResult.error) triggerError("Clear failed: " + totalsResult.error.message);
+        if (!confirm("DANGER: This will delete ALL attendance records. Continue?")) return;
+        const result = await clearAllEntries();
+        if (!result.success) triggerError("Clear failed: " + result.message);
+        else if (adminDate) fetchEntries(adminDate);
     };
 
     const exportToCSV = () => {
@@ -216,7 +184,7 @@ export default function ScannerPage() {
                         <div className="text-[10px] text-white/50">{adminDate} • {adminHours} Hrs</div>
                         <div className="flex items-center justify-center gap-2 text-[10px] text-green-500/50 uppercase tracking-widest mt-1">
                             <span className="h-1 w-1 bg-green-500 rounded-full animate-pulse" />
-                            Supabase Connected
+                            Sheets Connected
                         </div>
                     </div>
                     <div className="flex gap-2">
@@ -299,5 +267,13 @@ export default function ScannerPage() {
                 </div>
             </div>
         </main>
+    );
+}
+
+export default function ScannerPage() {
+    return (
+        <PasscodeGate>
+            <ScannerPageInner />
+        </PasscodeGate>
     );
 }
