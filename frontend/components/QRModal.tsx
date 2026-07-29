@@ -81,6 +81,7 @@ export default function QRModal({
                 </button>
 
                 <div className="flex flex-col items-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- dynamic base64 data URI, dimensions unknown until generated */}
                     <img
                         src={imageSrc}
                         alt={`QR code for ${rollNumber}`}

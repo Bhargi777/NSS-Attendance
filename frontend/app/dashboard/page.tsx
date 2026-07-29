@@ -37,7 +37,7 @@ export default function DashboardPage() {
                 setAttendance(attendanceRes.data);
 
                 // Extract unique dates and sort them chronologically
-                const uniqueDates = Array.from(new Set(attendanceRes.data.map((a: any) => a.date))).filter(Boolean) as string[];
+                const uniqueDates = Array.from(new Set(attendanceRes.data.map((a: Attendance) => a.date))).filter(Boolean) as string[];
                 uniqueDates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
                 setDates(uniqueDates);
             }

@@ -20,22 +20,37 @@ export default function ScannerPage() {
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const [modalError, setModalError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [adminDate, setAdminDate] = useState<string | null>(null);
-    const [adminHours, setAdminHours] = useState<number>(2);
+    const [adminDate] = useState<string | null>(() =>
+        typeof window !== "undefined" ? localStorage.getItem("attendance_date") : null
+    );
+    const [adminHours] = useState<number>(() =>
+        typeof window !== "undefined" ? Number(localStorage.getItem("attendance_hours")) || 2 : 2
+    );
+
+    const fetchEntries = async (currentDate: string) => {
+        const { data, error } = await supabase
+            .from("attendance")
+            .select("*")
+            .eq("date", currentDate)
+            .order("scanned_at", { ascending: false });
+
+        if (error) {
+            console.error("Error fetching attendance:", error);
+        } else {
+            setEntries(data || []);
+        }
+        setIsLoading(false);
+    };
 
     // Fetch from Supabase on mount
     useEffect(() => {
-        const date = localStorage.getItem("attendance_date");
-        const hours = localStorage.getItem("attendance_hours");
-
-        if (!date) {
+        if (!adminDate) {
             window.location.href = "/";
             return;
         }
-        setAdminDate(date);
-        setAdminHours(Number(hours) || 2);
 
-        fetchEntries(date);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- fetching attendance rows on mount is the intended effect
+        fetchEntries(adminDate);
 
         // Set up Realtime subscription
         const channel = supabase
@@ -53,22 +68,7 @@ export default function ScannerPage() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
-
-    const fetchEntries = async (currentDate: string) => {
-        const { data, error } = await supabase
-            .from("attendance")
-            .select("*")
-            .eq("date", currentDate)
-            .order("scanned_at", { ascending: false });
-
-        if (error) {
-            console.error("Error fetching attendance:", error);
-        } else {
-            setEntries(data || []);
-        }
-        setIsLoading(false);
-    };
+    }, [adminDate]);
 
     // Auto-hide error modal
     useEffect(() => {
