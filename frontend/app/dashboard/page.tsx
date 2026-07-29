@@ -10,15 +10,24 @@ interface Attendance {
     hours: number;
 }
 
+interface AttendanceTotal {
+    roll_number: string;
+    total_hours: number;
+}
+
 export default function DashboardPage() {
     const [rollNumbers, setRollNumbers] = useState<string[]>([]);
     const [attendance, setAttendance] = useState<Attendance[]>([]);
+    const [totals, setTotals] = useState<Record<string, number>>({});
     const [dates, setDates] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
-            const attendanceRes = await supabase.from("attendance").select("*");
+            const [attendanceRes, totalsRes] = await Promise.all([
+                supabase.from("attendance").select("*"),
+                supabase.from("attendance_totals").select("roll_number, total_hours"),
+            ]);
 
             if (attendanceRes.data) {
                 setAttendance(attendanceRes.data);
@@ -32,6 +41,14 @@ export default function DashboardPage() {
                 const uniqueDates = Array.from(new Set(attendanceRes.data.map((a: Attendance) => a.date))).filter(Boolean) as string[];
                 uniqueDates.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
                 setDates(uniqueDates);
+            }
+
+            if (totalsRes.data) {
+                const map: Record<string, number> = {};
+                totalsRes.data.forEach((t: AttendanceTotal) => {
+                    map[t.roll_number] = t.total_hours;
+                });
+                setTotals(map);
             }
 
             setIsLoading(false);
@@ -49,6 +66,13 @@ export default function DashboardPage() {
                     fetchDashboardData();
                 }
             )
+            .on(
+                "postgres_changes",
+                { event: "*", schema: "public", table: "attendance_totals" },
+                () => {
+                    fetchDashboardData();
+                }
+            )
             .subscribe();
 
         return () => {
@@ -59,15 +83,11 @@ export default function DashboardPage() {
     const getHours = (rollNumber: string, date: string) => {
         const records = attendance.filter(a => a.roll_number === rollNumber && a.date === date);
         if (records.length === 0) return null;
-        // In case multiple scans somehow exist for the same day, sum them up or take max.
         return records.reduce((sum, r) => sum + (r.hours || 0), 0).toFixed(1);
     };
 
     const getTotalHours = (rollNumber: string) => {
-        const total = attendance
-            .filter(a => a.roll_number === rollNumber)
-            .reduce((sum, r) => sum + (r.hours || 0), 0);
-        return total.toFixed(1);
+        return (totals[rollNumber] || 0).toFixed(1);
     };
 
     return (

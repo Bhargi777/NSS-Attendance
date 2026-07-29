@@ -6,11 +6,10 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
 interface ScannedEntry {
-    id?: string;
     roll_number: string;
-    scanned_at: string;
-    date?: string;
-    hours?: number;
+    total_hours: number;
+    last_date: string;
+    last_scanned_at: string;
 }
 
 export default function ScannerPage() {
@@ -29,10 +28,10 @@ export default function ScannerPage() {
 
     const fetchEntries = async (currentDate: string) => {
         const { data, error } = await supabase
-            .from("attendance")
+            .from("attendance_totals")
             .select("*")
-            .eq("date", currentDate)
-            .order("scanned_at", { ascending: false });
+            .eq("last_date", currentDate)
+            .order("last_scanned_at", { ascending: false });
 
         if (error) {
             console.error("Error fetching attendance:", error);
@@ -54,10 +53,10 @@ export default function ScannerPage() {
 
         // Set up Realtime subscription
         const channel = supabase
-            .channel("attendance_changes")
+            .channel("attendance_totals_changes")
             .on(
                 "postgres_changes",
-                { event: "*", schema: "public", table: "attendance" },
+                { event: "*", schema: "public", table: "attendance_totals" },
                 () => {
                     const date = localStorage.getItem("attendance_date");
                     if (date) fetchEntries(date);
@@ -109,21 +108,23 @@ export default function ScannerPage() {
 
     const addEntry = async (roll: string) => {
         const trimmed = roll.trim().toUpperCase();
-        if (!trimmed) return;
+        if (!trimmed || !adminDate) return;
 
         // Local check first for speed
         if (entries.some((e) => e.roll_number === trimmed)) {
-            triggerError(`DUPLICATE: ${trimmed} is already recorded.`);
+            triggerError(`DUPLICATE: ${trimmed} is already recorded today.`);
             return;
         }
 
-        const { error } = await supabase
-            .from("attendance")
-            .insert([{ roll_number: trimmed, date: adminDate, hours: adminHours }]);
+        const { error } = await supabase.rpc("record_scan", {
+            p_roll: trimmed,
+            p_date: adminDate,
+            p_hours: adminHours,
+        });
 
         if (error) {
-            if (error.code === "23505") { // Unique violation
-                triggerError(`DUPLICATE: ${trimmed} is already in the database.`);
+            if (error.message.includes("DUPLICATE_SCAN")) {
+                triggerError(`DUPLICATE: ${trimmed} is already scanned today.`);
             } else {
                 triggerError("Database error: " + error.message);
             }
@@ -151,22 +152,31 @@ export default function ScannerPage() {
         }
     };
 
-    const removeEntry = async (id: string) => {
-        if (!confirm("Remove this entry from the database?")) return;
-        const { error } = await supabase.from("attendance").delete().eq("id", id);
-        if (error) triggerError("Delete failed: " + error.message);
+    const removeEntry = async (rollNumber: string) => {
+        if (!confirm(`Remove ${rollNumber} entirely (total hours + history)?`)) return;
+        const [logResult, totalsResult] = await Promise.all([
+            supabase.from("attendance").delete().eq("roll_number", rollNumber),
+            supabase.from("attendance_totals").delete().eq("roll_number", rollNumber),
+        ]);
+        if (logResult.error) triggerError("Delete failed: " + logResult.error.message);
+        else if (totalsResult.error) triggerError("Delete failed: " + totalsResult.error.message);
+        else fetchEntries(adminDate!);
     };
 
     const clearAll = async () => {
         if (!confirm("DANGER: This will delete ALL attendance records from Supabase. Continue?")) return;
-        const { error } = await supabase.from("attendance").delete().neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
-        if (error) triggerError("Clear failed: " + error.message);
+        const [logResult, totalsResult] = await Promise.all([
+            supabase.from("attendance").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
+            supabase.from("attendance_totals").delete().neq("roll_number", ""),
+        ]);
+        if (logResult.error) triggerError("Clear failed: " + logResult.error.message);
+        else if (totalsResult.error) triggerError("Clear failed: " + totalsResult.error.message);
     };
 
     const exportToCSV = () => {
         if (entries.length === 0) return;
-        const headers = ["Roll Number", "Scan Date & Time"];
-        const rows = entries.map((e) => [e.roll_number, new Date(e.scanned_at).toLocaleString()]);
+        const headers = ["Roll Number", "Total Hours", "Last Scanned"];
+        const rows = entries.map((e) => [e.roll_number, e.total_hours, new Date(e.last_scanned_at).toLocaleString()]);
         const csvContent = [headers, ...rows].map((r) => r.join(",")).join("\n");
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const link = document.createElement("a");
@@ -257,22 +267,24 @@ export default function ScannerPage() {
                                     <thead className="sticky top-0 z-20 bg-black/95 backdrop-blur-sm text-[10px] font-black uppercase tracking-[0.2em] text-white/20">
                                         <tr>
                                             <th className="px-6 py-5">Roll No.</th>
+                                            <th className="px-6 py-5">Total Hrs</th>
                                             <th className="px-6 py-5">Sync Time</th>
                                             <th className="px-6 py-5 text-right">Opt</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/[0.04]">
                                         {isLoading ? (
-                                            <tr><td colSpan={3} className="py-24 text-center text-white/10 animate-pulse">Syncing with cloud...</td></tr>
+                                            <tr><td colSpan={4} className="py-24 text-center text-white/10 animate-pulse">Syncing with cloud...</td></tr>
                                         ) : entries.length === 0 ? (
-                                            <tr><td colSpan={3} className="py-24 text-center text-white/10 italic text-sm font-light">Cloud is empty. Ready for transmission.</td></tr>
+                                            <tr><td colSpan={4} className="py-24 text-center text-white/10 italic text-sm font-light">Cloud is empty. Ready for transmission.</td></tr>
                                         ) : (
-                                            entries.map((entry, index) => (
-                                                <tr key={index} className="group transition-colors hover:bg-white/[0.02]">
+                                            entries.map((entry) => (
+                                                <tr key={entry.roll_number} className="group transition-colors hover:bg-white/[0.02]">
                                                     <td className="px-6 py-5 font-mono text-sm tracking-tighter text-white/80">{entry.roll_number}</td>
-                                                    <td className="px-6 py-5 text-[10px] font-medium text-white/20">{new Date(entry.scanned_at).toLocaleTimeString()}</td>
+                                                    <td className="px-6 py-5 text-sm font-semibold text-[#e94560]">{entry.total_hours}</td>
+                                                    <td className="px-6 py-5 text-[10px] font-medium text-white/20">{new Date(entry.last_scanned_at).toLocaleTimeString()}</td>
                                                     <td className="px-6 py-5 text-right">
-                                                        <button onClick={() => entry.id && removeEntry(entry.id)} className="p-2 text-white/5 hover:text-red-500 transition-colors md:opacity-0 group-hover:opacity-100">
+                                                        <button onClick={() => removeEntry(entry.roll_number)} className="p-2 text-white/5 hover:text-red-500 transition-colors md:opacity-0 group-hover:opacity-100">
                                                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
                                                         </button>
                                                     </td>
