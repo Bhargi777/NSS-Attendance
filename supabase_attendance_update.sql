@@ -1,18 +1,19 @@
--- Run this side-by-side with your existing tables to upgrade the schema for the new Date-based system
+-- Run this against an existing database that was set up with the older,
+-- department-restricted schema (students table + FK on attendance.roll_number).
+-- Result: any roll number can be scanned, not just pre-seeded ones.
 
--- 1. Create the Students Table if not exists
-CREATE TABLE IF NOT EXISTS students (
-    roll_number TEXT PRIMARY KEY,
-    name TEXT NOT NULL
-);
-
--- 2. Add 'date' and 'hours' to existing Attendance Table
--- Using IF NOT EXISTS safely in PostgreSQL blocks or simple alters
+-- 1. Add 'date' and 'hours' to existing Attendance Table (no-op if already present)
 ALTER TABLE attendance ADD COLUMN IF NOT EXISTS date DATE;
 ALTER TABLE attendance ADD COLUMN IF NOT EXISTS hours NUMERIC DEFAULT 0;
 
--- 3. To track attendance per day per student unique:
--- Only run this after deleting duplicates, or if the table is fresh/cleared.
--- ALTER TABLE attendance ADD CONSTRAINT unique_roll_date UNIQUE(roll_number, date);
+-- 2. Drop the students FK so scanning isn't limited to a pre-seeded roster
+ALTER TABLE attendance DROP CONSTRAINT IF EXISTS attendance_roll_number_fkey;
+DROP TABLE IF EXISTS students;
 
--- 4. Re-run your Seed File (supabase_seed.sql) to populate the students table if needed!
+-- 3. Backfill 'date' for any pre-existing rows scanned before this column existed
+UPDATE attendance SET date = scanned_at::date WHERE date IS NULL;
+ALTER TABLE attendance ALTER COLUMN date SET NOT NULL;
+
+-- 4. Ensure one row per roll number per day (skip if this already exists)
+ALTER TABLE attendance DROP CONSTRAINT IF EXISTS attendance_roll_number_date_key;
+ALTER TABLE attendance ADD CONSTRAINT attendance_roll_number_date_key UNIQUE (roll_number, date);

@@ -4,11 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
-interface Student {
-    roll_number: string;
-    name: string;
-}
-
 interface Attendance {
     roll_number: string;
     date: string;
@@ -16,25 +11,22 @@ interface Attendance {
 }
 
 export default function DashboardPage() {
-    const [students, setStudents] = useState<Student[]>([]);
+    const [rollNumbers, setRollNumbers] = useState<string[]>([]);
     const [attendance, setAttendance] = useState<Attendance[]>([]);
     const [dates, setDates] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchDashboardData = async () => {
-            const [studentsRes, attendanceRes] = await Promise.all([
-                supabase.from("students").select("*"),
-                supabase.from("attendance").select("*")
-            ]);
-
-            if (studentsRes.data) {
-                // Sort students by name alphabetically
-                setStudents(studentsRes.data.sort((a, b) => a.name.localeCompare(b.name)));
-            }
+            const attendanceRes = await supabase.from("attendance").select("*");
 
             if (attendanceRes.data) {
                 setAttendance(attendanceRes.data);
+
+                // Roster is whoever has been scanned at least once, sorted by roll number
+                const uniqueRolls = Array.from(new Set(attendanceRes.data.map((a: Attendance) => a.roll_number)));
+                uniqueRolls.sort((a, b) => a.localeCompare(b));
+                setRollNumbers(uniqueRolls);
 
                 // Extract unique dates and sort them chronologically
                 const uniqueDates = Array.from(new Set(attendanceRes.data.map((a: Attendance) => a.date))).filter(Boolean) as string[];
@@ -106,8 +98,7 @@ export default function DashboardPage() {
                             <thead className="bg-black/60 text-xs uppercase tracking-wider text-white/50">
                                 <tr>
                                     <th className="sticky left-0 z-20 bg-black/95 px-6 py-4 font-semibold whitespace-nowrap border-b border-white/5">S.No</th>
-                                    <th className="sticky left-[72px] z-20 bg-black/95 px-6 py-4 font-semibold min-w-[200px] border-b border-white/5">Name</th>
-                                    <th className="sticky left-[272px] z-20 bg-black/95 px-6 py-4 font-semibold whitespace-nowrap border-b border-white/5 border-r">Roll No.</th>
+                                    <th className="sticky left-[72px] z-20 bg-black/95 px-6 py-4 font-semibold min-w-[200px] border-b border-white/5 border-r">Roll No.</th>
                                     <th className="px-6 py-4 font-semibold whitespace-nowrap border-b border-white/5 text-center text-[#e94560]">Total Hrs</th>
 
                                     {/* Dynamic Date Columns */}
@@ -124,31 +115,30 @@ export default function DashboardPage() {
                             <tbody className="divide-y divide-white/[0.04]">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={4 + dates.length} className="px-6 py-12 text-center text-white/20 animate-pulse">
+                                        <td colSpan={3 + dates.length} className="px-6 py-12 text-center text-white/20 animate-pulse">
                                             Loading dashboard data...
                                         </td>
                                     </tr>
-                                ) : students.length === 0 ? (
+                                ) : rollNumbers.length === 0 ? (
                                     <tr>
-                                        <td colSpan={4 + dates.length} className="px-6 py-12 text-center text-white/30 italic">
-                                            No students found. Did you run the seed list?
+                                        <td colSpan={3 + dates.length} className="px-6 py-12 text-center text-white/30 italic">
+                                            No scans recorded yet.
                                         </td>
                                     </tr>
                                 ) : (
-                                    students.map((student, idx) => (
-                                        <tr key={student.roll_number} className="group hover:bg-white/[0.02] transition-colors">
+                                    rollNumbers.map((rollNumber, idx) => (
+                                        <tr key={rollNumber} className="group hover:bg-white/[0.02] transition-colors">
                                             <td className="sticky left-0 z-10 bg-black/40 group-hover:bg-[#1a1a1a] px-6 py-3 font-mono text-white/40">{idx + 1}</td>
-                                            <td className="sticky left-[72px] z-10 bg-black/40 group-hover:bg-[#1a1a1a] px-6 py-3 font-medium text-white/90">{student.name}</td>
-                                            <td className="sticky left-[272px] z-10 bg-black/40 group-hover:bg-[#1a1a1a] px-6 py-3 font-mono text-xs text-white/50 border-r border-white/5">{student.roll_number}</td>
+                                            <td className="sticky left-[72px] z-10 bg-black/40 group-hover:bg-[#1a1a1a] px-6 py-3 font-mono text-xs text-white/50 border-r border-white/5">{rollNumber}</td>
 
                                             {/* Total Hours */}
                                             <td className="px-6 py-3 text-center font-bold text-[#e94560] bg-white/[0.01]">
-                                                {getTotalHours(student.roll_number)}
+                                                {getTotalHours(rollNumber)}
                                             </td>
 
                                             {/* Date Columns for Hours */}
                                             {dates.map(date => {
-                                                const hours = getHours(student.roll_number, date);
+                                                const hours = getHours(rollNumber, date);
                                                 return (
                                                     <td key={date} className={`px-6 py-3 text-center font-mono text-sm ${hours ? 'text-green-400 font-semibold' : 'text-white/10'}`}>
                                                         {hours ? `${hours}h` : '--'}
