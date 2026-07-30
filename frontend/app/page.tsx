@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { generateQR } from "@/services/api";
 import QRModal from "@/components/QRModal";
 import PasscodeForm from "@/components/PasscodeForm";
-import { getStoredToken } from "@/services/sheets";
+import { isUnlockedThisPageLoad, markUnlocked } from "@/services/sheets";
 
 type AdminStep = "closed" | "passcode" | "setup";
 
@@ -22,10 +22,7 @@ export default function Home() {
   const [adminHours, setAdminHours] = useState("2");
 
   const openAdminPanel = () => {
-    const token = getStoredToken();
-    const [expiry] = (token || "").split(".");
-    const alreadyUnlocked = token && Number(expiry) > Date.now();
-    setAdminStep(alreadyUnlocked ? "setup" : "passcode");
+    setAdminStep(isUnlockedThisPageLoad() ? "setup" : "passcode");
   };
 
   const handleGenerate = async () => {
@@ -173,7 +170,10 @@ export default function Home() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
           <PasscodeForm
             subtitle="Enter the scanner passcode to open the admin panel."
-            onSuccess={() => setAdminStep("setup")}
+            onSuccess={() => {
+              markUnlocked();
+              setAdminStep("setup");
+            }}
           />
         </div>
       )}
@@ -236,11 +236,11 @@ export default function Home() {
       {/* Footer */}
       <button
         onClick={openAdminPanel}
-        className="mt-8 text-xs font-medium text-white/20 active:text-white/50"
+        className="mt-8 rounded-xl border border-white/15 px-6 py-3 text-sm font-semibold text-white/70 active:bg-white/10"
       >
         Admin
       </button>
-      <p className="mt-1 text-xs text-white/20">
+      <p className="mt-4 text-xs text-white/20">
         Amrita Vishwa Vidyapeetham
       </p>
 

@@ -47,6 +47,19 @@ export function clearToken() {
     document.cookie = `${SESSION_COOKIE}=; path=/; max-age=0`;
 }
 
+// In-memory only (not sessionStorage/cookie) so a hard refresh or reopening
+// the site always re-prompts for the passcode; only SPA navigation within
+// the same page load is remembered.
+let unlockedThisPageLoad = false;
+
+export function markUnlocked() {
+    unlockedThisPageLoad = true;
+}
+
+export function isUnlockedThisPageLoad(): boolean {
+    return unlockedThisPageLoad;
+}
+
 export async function verifyPasscode(passcode: string): Promise<{ success: boolean; message?: string }> {
     const res = await callApi<never>("verifyPasscode", { passcode });
     if (res.success && res.token) {

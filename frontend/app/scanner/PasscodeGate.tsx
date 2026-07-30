@@ -2,17 +2,10 @@
 
 import { useState } from "react";
 import PasscodeForm from "@/components/PasscodeForm";
-import { getStoredToken } from "@/services/sheets";
-
-function hasValidToken(): boolean {
-    const token = getStoredToken();
-    if (!token) return false;
-    const [expiry] = token.split(".");
-    return Number(expiry) > Date.now();
-}
+import { isUnlockedThisPageLoad, markUnlocked } from "@/services/sheets";
 
 export default function PasscodeGate({ children }: { children: React.ReactNode }) {
-    const [unlocked, setUnlocked] = useState(() => (typeof window !== "undefined" ? hasValidToken() : false));
+    const [unlocked, setUnlocked] = useState(() => isUnlockedThisPageLoad());
 
     if (!unlocked) {
         return (
@@ -20,7 +13,10 @@ export default function PasscodeGate({ children }: { children: React.ReactNode }
                 <PasscodeForm
                     title="Scanner Locked"
                     subtitle="This page needs the scanner passcode."
-                    onSuccess={() => setUnlocked(true)}
+                    onSuccess={() => {
+                        markUnlocked();
+                        setUnlocked(true);
+                    }}
                 />
             </main>
         );
