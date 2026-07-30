@@ -20,13 +20,16 @@ async function callApi<T>(action: string, payload: Record<string, unknown> = {})
         return { success: false, message: "NEXT_PUBLIC_SHEETS_API_URL is not configured." };
     }
 
-    const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action, ...payload }),
-    });
-
-    return response.json();
+    try {
+        const response = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action, ...payload }),
+        });
+        return await response.json();
+    } catch {
+        return { success: false, message: "Could not reach the server. Check deployment access is set to \"Anyone\"." };
+    }
 }
 
 export function getStoredToken(): string | null {
