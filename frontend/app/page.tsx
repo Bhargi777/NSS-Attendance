@@ -70,16 +70,12 @@ export default function Home() {
   };
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-black px-4">
-      {/* Background gradient orbs */}
-      <div className="pointer-events-none absolute -left-40 -top-40 h-96 w-96 rounded-full bg-[#e94560]/20 blur-[120px]" />
-      <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-[#533483]/20 blur-[120px]" />
-
+    <main className="flex min-h-screen flex-col items-center justify-center bg-black px-4 py-8">
       {/* Card */}
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/[0.08] bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-8 shadow-2xl backdrop-blur-xl">
+      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.03] p-6 sm:p-8">
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="bg-gradient-to-r from-white to-white/70 bg-clip-text text-2xl font-bold tracking-tight text-transparent">
+          <h1 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
             QR Generator
           </h1>
           <p className="mt-2 text-sm text-white/40">
@@ -91,7 +87,7 @@ export default function Home() {
         <div className="mb-6">
           <label
             htmlFor="roll-number-input"
-            className="mb-2 block text-xs font-medium uppercase tracking-wider text-white/50"
+            className="mb-2 block text-xs font-medium text-white/40"
           >
             Roll Number
           </label>
@@ -106,7 +102,7 @@ export default function Home() {
             onKeyDown={handleKeyPress}
             placeholder="e.g. CB.EN.U4CSE12345"
             maxLength={20}
-            className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white placeholder-white/25 outline-none transition-all duration-200 focus:border-[#e94560]/50 focus:bg-white/[0.06] focus:ring-2 focus:ring-[#e94560]/20"
+            className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-base text-white placeholder-white/25 outline-none transition-colors focus:border-white/40"
           />
 
           {/* Error message */}
@@ -122,7 +118,7 @@ export default function Home() {
           id="generate-btn"
           onClick={handleGenerate}
           disabled={isLoading}
-          className="relative flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#e94560] to-[#c23152] px-6 py-3.5 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-xl active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-semibold text-black transition-opacity active:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {isLoading ? (
             <>
@@ -184,24 +180,24 @@ export default function Home() {
 
       {/* Admin Panel: date/hours step */}
       {adminStep === "setup" && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
-          <div className="mx-4 w-full max-w-sm animate-fade-in rounded-2xl border border-white/[0.08] bg-black p-8 shadow-2xl">
-            <h3 className="mb-4 text-xl font-bold text-white">Scanner Setup</h3>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 px-4">
+          <div className="w-full max-w-sm animate-fade-in rounded-2xl border border-white/10 bg-black p-6 sm:p-8">
+            <h3 className="mb-4 text-lg font-semibold text-white">Scanner Setup</h3>
 
             <div className="mb-4">
-              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-white/50">
+              <label className="mb-2 block text-xs font-medium text-white/40">
                 Date
               </label>
               <input
                 type="date"
                 value={adminDate}
                 onChange={(e) => setAdminDate(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none focus:border-[#e94560]/50"
+                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-base text-white outline-none focus:border-white/40"
               />
             </div>
 
             <div className="mb-6">
-              <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-white/50">
+              <label className="mb-2 block text-xs font-medium text-white/40">
                 Working Hours
               </label>
               <input
@@ -210,14 +206,14 @@ export default function Home() {
                 onChange={(e) => setAdminHours(e.target.value)}
                 min="0"
                 step="0.5"
-                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none focus:border-[#e94560]/50"
+                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-base text-white outline-none focus:border-white/40"
               />
             </div>
 
             <div className="flex gap-3">
               <button
                 onClick={() => setAdminStep("closed")}
-                className="flex-1 rounded-xl bg-white/5 py-3 text-sm font-semibold text-white/70 hover:bg-white/10"
+                className="flex-1 rounded-xl border border-white/10 py-3 text-sm font-semibold text-white/70 active:bg-white/5"
               >
                 Cancel
               </button>
@@ -228,7 +224,7 @@ export default function Home() {
                   localStorage.setItem("attendance_hours", adminHours);
                   router.push("/scanner");
                 }}
-                className="flex-1 rounded-xl bg-gradient-to-r from-[#e94560] to-[#c23152] py-3 text-sm font-semibold text-white hover:scale-105 transition-transform"
+                className="flex-1 rounded-xl bg-white py-3 text-sm font-semibold text-black active:opacity-80"
               >
                 Start Scanner
               </button>
@@ -240,7 +236,7 @@ export default function Home() {
       {/* Footer */}
       <button
         onClick={openAdminPanel}
-        className="mt-8 text-xs font-semibold uppercase tracking-widest text-white/20 hover:text-white/50 transition-colors"
+        className="mt-8 text-xs font-medium text-white/20 active:text-white/50"
       >
         Admin
       </button>

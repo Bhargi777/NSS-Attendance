@@ -35,8 +35,8 @@ export default function PasscodeForm({
     };
 
     return (
-        <div className="mx-4 w-full max-w-sm animate-fade-in rounded-2xl border border-white/[0.08] bg-black p-8 shadow-2xl">
-            <h3 className="mb-1 text-xl font-bold text-white">{title}</h3>
+        <div className="mx-4 w-full max-w-sm animate-fade-in rounded-2xl border border-white/10 bg-black p-6 sm:p-8">
+            <h3 className="mb-1 text-lg font-semibold text-white">{title}</h3>
             <p className="mb-6 text-sm text-white/40">{subtitle}</p>
 
             <input
@@ -49,7 +49,7 @@ export default function PasscodeForm({
                 onKeyDown={(e) => e.key === "Enter" && !isChecking && handleSubmit()}
                 placeholder="Passcode"
                 autoFocus
-                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none focus:border-[#e94560]/50"
+                className="w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-base text-white outline-none focus:border-white/40"
             />
 
             {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
@@ -57,7 +57,7 @@ export default function PasscodeForm({
             <button
                 onClick={handleSubmit}
                 disabled={isChecking || !passcode.trim()}
-                className="mt-6 w-full rounded-xl bg-gradient-to-r from-[#e94560] to-[#c23152] py-3 text-sm font-semibold text-white transition-transform hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-6 w-full rounded-xl bg-white py-3 text-sm font-semibold text-black transition-opacity active:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
             >
                 {isChecking ? "Checking..." : "Unlock"}
             </button>

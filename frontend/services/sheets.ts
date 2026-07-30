@@ -74,24 +74,7 @@ export async function listTotals(): Promise<TotalsEntry[]> {
     return res.success && res.data ? res.data : [];
 }
 
-export interface LogEntry {
-    roll_number: string;
-    date: string;
-    hours: number;
-}
-
-export async function listAll(): Promise<{ log: LogEntry[]; totals: TotalsEntry[] }> {
-    const token = getStoredToken();
-    const res = await callApi<{ log: LogEntry[]; totals: TotalsEntry[] }>("listAll", { token });
-    return res.success && res.data ? res.data : { log: [], totals: [] };
-}
-
 export async function deleteEntry(rollNumber: string) {
     const token = getStoredToken();
     return callApi<never>("deleteEntry", { token, rollNumber });
-}
-
-export async function clearAllEntries() {
-    const token = getStoredToken();
-    return callApi<never>("clearAll", { token });
 }
