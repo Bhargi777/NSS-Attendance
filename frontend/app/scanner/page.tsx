@@ -15,7 +15,7 @@ function ScannerPageInner() {
     const [manualInput, setManualInput] = useState("");
     const [isScanning, setIsScanning] = useState(false);
     const scannerRef = useRef<Html5Qrcode | null>(null);
-    const [modalError, setModalError] = useState<string | null>(null);
+    const [modalError, setModalError] = useState<{ title: string; message: string } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [adminDate] = useState<string | null>(() =>
         typeof window !== "undefined" ? localStorage.getItem("attendance_date") : null
@@ -69,7 +69,7 @@ function ScannerPageInner() {
             (text) => addEntry(text),
             undefined
         ).catch((err) => {
-            setModalError("Scanner error: " + err);
+            setModalError({ title: "Scanner Error", message: "Scanner error: " + err });
             setIsScanning(false);
         });
     };
@@ -91,7 +91,7 @@ function ScannerPageInner() {
 
         // Local check first for speed
         if (entries.some((e) => e.roll_number === trimmed)) {
-            triggerError(`DUPLICATE: ${trimmed} is already recorded today.`);
+            triggerError("Duplicate Found", `DUPLICATE: ${trimmed} is already recorded today.`);
             return;
         }
 
@@ -99,9 +99,11 @@ function ScannerPageInner() {
 
         if (!result.success) {
             if (result.code === "DUPLICATE_SCAN") {
-                triggerError(`DUPLICATE: ${trimmed} is already scanned today.`);
+                triggerError("Duplicate Found", `DUPLICATE: ${trimmed} is already scanned today.`);
+            } else if (result.code === "UNKNOWN_BATCH") {
+                triggerError("Unrecognized Roll Number", result.message || `${trimmed} doesn't match a known batch.`);
             } else {
-                triggerError("Database error: " + result.message);
+                triggerError("Database Error", "Database error: " + result.message);
             }
             return;
         }
@@ -113,8 +115,8 @@ function ScannerPageInner() {
         fetchEntries(adminDate);
     };
 
-    const triggerError = (msg: string) => {
-        setModalError(msg);
+    const triggerError = (title: string, msg: string) => {
+        setModalError({ title, message: msg });
         if (typeof navigator !== "undefined" && navigator.vibrate) {
             navigator.vibrate([100, 50, 100]);
         }
@@ -130,14 +132,14 @@ function ScannerPageInner() {
     const removeEntry = async (rollNumber: string) => {
         if (!confirm(`Remove ${rollNumber} entirely (total hours + history)?`)) return;
         const result = await deleteEntry(rollNumber);
-        if (!result.success) triggerError("Delete failed: " + result.message);
+        if (!result.success) triggerError("Delete Failed", "Delete failed: " + result.message);
         else if (adminDate) fetchEntries(adminDate);
     };
 
     const exportToCSV = () => {
         if (entries.length === 0) return;
-        const headers = ["Roll Number", "Total Hours", "Last Scanned"];
-        const rows = entries.map((e) => [e.roll_number, e.total_hours, new Date(e.last_scanned_at).toLocaleString()]);
+        const headers = ["Roll Number", "Batch", "Total Hours", "Last Scanned"];
+        const rows = entries.map((e) => [e.roll_number, e.batch, e.total_hours, new Date(e.last_scanned_at).toLocaleString()]);
         const csvContent = [headers, ...rows].map((r) => r.join(",")).join("\n");
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const link = document.createElement("a");
@@ -155,8 +157,8 @@ function ScannerPageInner() {
                         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-500/10 text-red-500">
                             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
                         </div>
-                        <h3 className="mb-2 text-lg font-semibold text-red-400">Duplicate Found</h3>
-                        <p className="text-sm text-white/60">{modalError}</p>
+                        <h3 className="mb-2 text-lg font-semibold text-red-400">{modalError.title}</h3>
+                        <p className="text-sm text-white/60">{modalError.message}</p>
                         <button onClick={() => setModalError(null)} className="mt-6 w-full rounded-xl border border-white/10 py-3 text-sm font-semibold text-white active:bg-white/5">Close</button>
                     </div>
                 </div>
@@ -216,6 +218,7 @@ function ScannerPageInner() {
                                     <thead className="sticky top-0 z-20 bg-black/95 text-[10px] font-medium uppercase tracking-wide text-white/30">
                                         <tr>
                                             <th className="px-4 py-3 sm:px-6 sm:py-4">Roll No.</th>
+                                            <th className="px-4 py-3 sm:px-6 sm:py-4">Batch</th>
                                             <th className="px-4 py-3 sm:px-6 sm:py-4">Hrs</th>
                                             <th className="px-4 py-3 sm:px-6 sm:py-4">Time</th>
                                             <th className="px-4 py-3 sm:px-6 sm:py-4"></th>
@@ -223,13 +226,16 @@ function ScannerPageInner() {
                                     </thead>
                                     <tbody className="divide-y divide-white/[0.06]">
                                         {isLoading ? (
-                                            <tr><td colSpan={4} className="py-20 text-center text-white/20">Loading...</td></tr>
+                                            <tr><td colSpan={5} className="py-20 text-center text-white/20">Loading...</td></tr>
                                         ) : entries.length === 0 ? (
-                                            <tr><td colSpan={4} className="py-20 text-center text-sm text-white/20">No scans yet.</td></tr>
+                                            <tr><td colSpan={5} className="py-20 text-center text-sm text-white/20">No scans yet.</td></tr>
                                         ) : (
                                             entries.map((entry) => (
                                                 <tr key={entry.roll_number} className="group">
                                                     <td className="px-4 py-3.5 font-mono text-sm text-white/80 sm:px-6">{entry.roll_number}</td>
+                                                    <td className="px-4 py-3.5 text-xs text-white/50 sm:px-6">
+                                                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5">{entry.batch}</span>
+                                                    </td>
                                                     <td className="px-4 py-3.5 text-sm font-medium text-white sm:px-6">{entry.total_hours}</td>
                                                     <td className="px-4 py-3.5 text-xs text-white/30 sm:px-6">{new Date(entry.last_scanned_at).toLocaleTimeString()}</td>
                                                     <td className="px-4 py-3.5 text-right sm:px-6">

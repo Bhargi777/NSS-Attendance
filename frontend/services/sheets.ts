@@ -74,6 +74,7 @@ export interface TotalsEntry {
     total_hours: number;
     last_date: string;
     last_scanned_at: string;
+    batch: string;
 }
 
 export async function recordScan(rollNumber: string, date: string, hours: number) {

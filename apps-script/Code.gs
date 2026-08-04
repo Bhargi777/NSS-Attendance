@@ -8,12 +8,27 @@
  *   PASSCODE      - the shared scanner passcode
  *   TOKEN_SECRET  - random string used to sign session tokens
  *
- * Sheets required (created automatically on first write if missing):
- *   Log    : roll_number | date | hours | scanned_at
- *   Totals : roll_number | total_hours | last_date | last_scanned_at
+ * Sheets required (created automatically on first write if missing), one
+ * pair per batch year (parsed from the roll number's trailing YYNNN):
+ *   Log_24    / Totals_24  : roll_number | date | hours | scanned_at
+ *   Log_25    / Totals_25    ...(same columns, one pair per KNOWN_BATCHES entry)
+ *   Log_26    / Totals_26
  */
 
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+
+// Batch years currently in the system. Add the new 2-digit year here each
+// intake (e.g. push "27") — everything else derives from this list.
+const KNOWN_BATCHES = ["24", "25", "26"];
+
+// CB.SC.U4CSE24268 -> "24". Amrita roll numbers end in 2-digit intake year
+// followed by a 3-digit serial; unrecognized/garbage rolls return null.
+function parseBatch(rollNumber) {
+  var m = /(\d{2})(\d{3})$/.exec(rollNumber);
+  if (!m) return null;
+  var yy = m[1];
+  return KNOWN_BATCHES.indexOf(yy) === -1 ? null : yy;
+}
 
 function doPost(e) {
   var response;
@@ -94,24 +109,22 @@ function signPayload(payload) {
 
 // ---------- Sheet helpers ----------
 
-function getLogSheet() {
+function getOrCreateSheet(name, headers) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Log");
+  var sheet = ss.getSheetByName(name);
   if (!sheet) {
-    sheet = ss.insertSheet("Log");
-    sheet.appendRow(["roll_number", "date", "hours", "scanned_at"]);
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(headers);
   }
   return sheet;
 }
 
-function getTotalsSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Totals");
-  if (!sheet) {
-    sheet = ss.insertSheet("Totals");
-    sheet.appendRow(["roll_number", "total_hours", "last_date", "last_scanned_at"]);
-  }
-  return sheet;
+function getLogSheet(batch) {
+  return getOrCreateSheet("Log_" + batch, ["roll_number", "date", "hours", "scanned_at"]);
+}
+
+function getTotalsSheet(batch) {
+  return getOrCreateSheet("Totals_" + batch, ["roll_number", "total_hours", "last_date", "last_scanned_at"]);
 }
 
 function sheetToObjects(sheet) {
@@ -155,10 +168,15 @@ function handleRecordScan(body) {
     return { success: false, message: "rollNumber, date and hours are required" };
   }
 
+  var batch = parseBatch(rollNumber);
+  if (!batch) {
+    return { success: false, code: "UNKNOWN_BATCH", message: "Unrecognized roll number: " + rollNumber };
+  }
+
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    var totalsSheet = getTotalsSheet();
+    var totalsSheet = getTotalsSheet(batch);
     var rowIndex = findRowByRollNumber(totalsSheet, rollNumber);
 
     if (rowIndex !== -1) {
@@ -168,7 +186,7 @@ function handleRecordScan(body) {
       }
     }
 
-    var logSheet = getLogSheet();
+    var logSheet = getLogSheet(batch);
     logSheet.appendRow([rollNumber, date, hours, new Date()]);
 
     var newTotal;
@@ -183,21 +201,30 @@ function handleRecordScan(body) {
 
     return {
       success: true,
-      data: { roll_number: rollNumber, total_hours: newTotal, last_date: date }
+      data: { roll_number: rollNumber, total_hours: newTotal, last_date: date, batch: batch }
     };
   } finally {
     lock.releaseLock();
   }
 }
 
+function sheetExists(name) {
+  return !!SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+}
+
 function handleListTotals() {
-  var rows = sheetToObjects(getTotalsSheet()).map(function (r) {
-    return {
-      roll_number: r.roll_number,
-      total_hours: r.total_hours,
-      last_date: formatDate(r.last_date),
-      last_scanned_at: r.last_scanned_at
-    };
+  var rows = [];
+  KNOWN_BATCHES.forEach(function (batch) {
+    if (!sheetExists("Totals_" + batch)) return;
+    sheetToObjects(getTotalsSheet(batch)).forEach(function (r) {
+      rows.push({
+        roll_number: r.roll_number,
+        total_hours: r.total_hours,
+        last_date: formatDate(r.last_date),
+        last_scanned_at: r.last_scanned_at,
+        batch: batch
+      });
+    });
   });
   return { success: true, data: rows };
 }
@@ -208,14 +235,19 @@ function handleDeleteEntry(body) {
     return { success: false, message: "rollNumber is required" };
   }
 
+  var batch = parseBatch(rollNumber);
+  if (!batch) {
+    return { success: false, code: "UNKNOWN_BATCH", message: "Unrecognized roll number: " + rollNumber };
+  }
+
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    var totalsSheet = getTotalsSheet();
+    var totalsSheet = getTotalsSheet(batch);
     var totalsRow = findRowByRollNumber(totalsSheet, rollNumber);
     if (totalsRow !== -1) totalsSheet.deleteRow(totalsRow);
 
-    var logSheet = getLogSheet();
+    var logSheet = getLogSheet(batch);
     var logValues = logSheet.getDataRange().getValues();
     for (var i = logValues.length - 1; i >= 1; i--) {
       if (logValues[i][0] === rollNumber) logSheet.deleteRow(i + 1);
@@ -231,14 +263,20 @@ function handleClearAll() {
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    var logSheet = getLogSheet();
-    if (logSheet.getLastRow() > 1) {
-      logSheet.getRange(2, 1, logSheet.getLastRow() - 1, logSheet.getLastColumn()).clearContent();
-    }
-    var totalsSheet = getTotalsSheet();
-    if (totalsSheet.getLastRow() > 1) {
-      totalsSheet.getRange(2, 1, totalsSheet.getLastRow() - 1, totalsSheet.getLastColumn()).clearContent();
-    }
+    KNOWN_BATCHES.forEach(function (batch) {
+      if (sheetExists("Log_" + batch)) {
+        var logSheet = getLogSheet(batch);
+        if (logSheet.getLastRow() > 1) {
+          logSheet.getRange(2, 1, logSheet.getLastRow() - 1, logSheet.getLastColumn()).clearContent();
+        }
+      }
+      if (sheetExists("Totals_" + batch)) {
+        var totalsSheet = getTotalsSheet(batch);
+        if (totalsSheet.getLastRow() > 1) {
+          totalsSheet.getRange(2, 1, totalsSheet.getLastRow() - 1, totalsSheet.getLastColumn()).clearContent();
+        }
+      }
+    });
     return { success: true };
   } finally {
     lock.releaseLock();
@@ -246,40 +284,91 @@ function handleClearAll() {
 }
 
 function handleListAll() {
-  var log = sheetToObjects(getLogSheet()).map(function (r) {
-    return { roll_number: r.roll_number, date: formatDate(r.date), hours: r.hours };
-  });
-  var totals = sheetToObjects(getTotalsSheet()).map(function (r) {
-    return { roll_number: r.roll_number, total_hours: r.total_hours };
+  var log = [];
+  var totals = [];
+  KNOWN_BATCHES.forEach(function (batch) {
+    if (sheetExists("Log_" + batch)) {
+      sheetToObjects(getLogSheet(batch)).forEach(function (r) {
+        log.push({ roll_number: r.roll_number, date: formatDate(r.date), hours: r.hours, batch: batch });
+      });
+    }
+    if (sheetExists("Totals_" + batch)) {
+      sheetToObjects(getTotalsSheet(batch)).forEach(function (r) {
+        totals.push({ roll_number: r.roll_number, total_hours: r.total_hours, batch: batch });
+      });
+    }
   });
   return { success: true, data: { log: log, totals: totals } };
 }
 
 // ---------- One-off migration helper ----------
-// Run manually from the Apps Script editor after pasting exported Supabase
-// `attendance` rows into the Log tab, to rebuild Totals from history.
-function rebuildTotals() {
-  var log = sheetToObjects(getLogSheet());
-  var totalsByRoll = {};
+// Run manually from the Apps Script editor to split the legacy single
+// Log/Totals tab pair into per-batch Log_YY/Totals_YY tabs. Safe to run
+// only once — refuses if any Log_YY already has data rows. Rows whose roll
+// number doesn't parse to a known batch are skipped and reported via
+// Logger.log (View > Logs) instead of being written anywhere; fix those up
+// by hand afterwards. Legacy Log/Totals tabs are left untouched — rename or
+// delete them yourself once you've verified the split.
+function migrateToBatchSheets() {
+  var alreadyMigrated = KNOWN_BATCHES.some(function (batch) {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Log_" + batch);
+    return sheet && sheet.getLastRow() > 1;
+  });
+  if (alreadyMigrated) {
+    throw new Error("migrateToBatchSheets: a Log_YY sheet already has data — aborting to avoid duplicating rows.");
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var legacyLog = ss.getSheetByName("Log");
+  if (!legacyLog) {
+    throw new Error("migrateToBatchSheets: no legacy \"Log\" sheet found.");
+  }
+
+  var log = sheetToObjects(legacyLog);
+  var rowsByBatch = {};
+  var skipped = [];
 
   log.forEach(function (row) {
-    var roll = row.roll_number;
-    var date = formatDate(row.date);
-    var hours = Number(row.hours) || 0;
-    if (!totalsByRoll[roll]) {
-      totalsByRoll[roll] = { total_hours: 0, last_date: date };
+    var roll = String(row.roll_number || "").trim().toUpperCase();
+    var batch = parseBatch(roll);
+    if (!batch) {
+      skipped.push(roll);
+      return;
     }
-    totalsByRoll[roll].total_hours += hours;
-    if (date > totalsByRoll[roll].last_date) {
-      totalsByRoll[roll].last_date = date;
-    }
+    if (!rowsByBatch[batch]) rowsByBatch[batch] = [];
+    rowsByBatch[batch].push({
+      roll_number: roll,
+      date: formatDate(row.date),
+      hours: Number(row.hours) || 0,
+      scanned_at: row.scanned_at
+    });
   });
 
-  var totalsSheet = getTotalsSheet();
-  totalsSheet.clear();
-  totalsSheet.appendRow(["roll_number", "total_hours", "last_date", "last_scanned_at"]);
-  Object.keys(totalsByRoll).forEach(function (roll) {
-    var t = totalsByRoll[roll];
-    totalsSheet.appendRow([roll, t.total_hours, t.last_date, new Date()]);
+  Object.keys(rowsByBatch).forEach(function (batch) {
+    var logSheet = getLogSheet(batch);
+    var totalsByRoll = {};
+
+    rowsByBatch[batch].forEach(function (row) {
+      logSheet.appendRow([row.roll_number, row.date, row.hours, row.scanned_at]);
+
+      if (!totalsByRoll[row.roll_number]) {
+        totalsByRoll[row.roll_number] = { total_hours: 0, last_date: row.date };
+      }
+      totalsByRoll[row.roll_number].total_hours += row.hours;
+      if (row.date > totalsByRoll[row.roll_number].last_date) {
+        totalsByRoll[row.roll_number].last_date = row.date;
+      }
+    });
+
+    var totalsSheet = getTotalsSheet(batch);
+    Object.keys(totalsByRoll).forEach(function (roll) {
+      var t = totalsByRoll[roll];
+      totalsSheet.appendRow([roll, t.total_hours, t.last_date, new Date()]);
+    });
   });
+
+  if (skipped.length) {
+    Logger.log("migrateToBatchSheets: skipped %s row(s) with unrecognized roll numbers: %s", skipped.length, skipped.join(", "));
+  }
+  Logger.log("migrateToBatchSheets: done. Batches written: %s", Object.keys(rowsByBatch).join(", ") || "(none)");
 }
