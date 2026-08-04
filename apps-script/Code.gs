@@ -10,16 +10,15 @@
  *
  * Sheets required (created automatically on first write if missing), one
  * pair per batch year (parsed from the roll number's trailing YYNNN):
- *   Log_24    / Totals_24  : roll_number | date | hours | scanned_at
- *   Log_25    / Totals_25    ...(same columns, one pair per KNOWN_BATCHES entry)
- *   Log_26    / Totals_26
+ *   Log_25    / Totals_25  : roll_number | date | hours | scanned_at
+ *   Log_26    / Totals_26    ...(same columns, one pair per KNOWN_BATCHES entry)
  */
 
 const TOKEN_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 // Batch years currently in the system. Add the new 2-digit year here each
 // intake (e.g. push "27") — everything else derives from this list.
-const KNOWN_BATCHES = ["24", "25", "26"];
+const KNOWN_BATCHES = ["25", "26"];
 
 // CB.SC.U4CSE24268 -> "24". Amrita roll numbers end in 2-digit intake year
 // followed by a 3-digit serial; unrecognized/garbage rolls return null.
